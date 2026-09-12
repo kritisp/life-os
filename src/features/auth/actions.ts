@@ -29,6 +29,22 @@ export async function signUp(formData: FormData) {
   })
 
   if (error) {
+    if (error.message.toLowerCase().includes('rate limit')) {
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (!signInError && signInData.user) {
+        return { success: true, user: signInData.user }
+      }
+
+      return {
+        error:
+          'Supabase email rate limit active for new signups. Use the "⚡ DEMO OPERATOR ACCESS" button below or ACCESS OPERATOR tab to log in!',
+      }
+    }
+
     return { error: sanitizeErrorMessage(error) }
   }
 
@@ -129,4 +145,59 @@ export async function getCharacter() {
     .single()
 
   return (character as CharacterRow | null)
+}
+
+export async function demoLogin() {
+  const supabase = await createClient()
+  const demoEmail = 'operator_demo@lifeos.dev'
+  const demoPassword = 'DemoPassword123!'
+
+  let { data, error } = await supabase.auth.signInWithPassword({
+    email: demoEmail,
+    password: demoPassword,
+  })
+
+  if (error || !data.user) {
+    const signUpRes = await supabase.auth.signUp({
+      email: demoEmail,
+      password: demoPassword,
+      options: {
+        data: {
+          display_name: 'Demo Operator',
+          username: 'demo_operator',
+        },
+      },
+    })
+    data = signUpRes.data
+  }
+
+  if (data?.user) {
+    const { data: existingChar } = await supabase
+      .from('characters')
+      .select('id')
+      .eq('user_id', data.user.id)
+      .single()
+
+    if (!existingChar) {
+      await supabase.from('characters').insert({
+        user_id: data.user.id,
+        name: 'Demo Operator',
+        level: 1,
+        xp: 0,
+        gold: 100,
+        strength: 10,
+        intellect: 10,
+        discipline: 10,
+        vitality: 10,
+        creativity: 10,
+        current_streak: 1,
+        longest_streak: 1,
+        momentum: 100,
+        archetype: 'The Balanced',
+      } as CharacterRow)
+    }
+    return { success: true, user: data.user }
+  }
+
+  return { error: 'Could not initialize demo operator session.' }
 }

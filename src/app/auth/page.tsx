@@ -2,14 +2,27 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { signUp, logIn } from '@/features/auth/actions'
-import { Terminal, ArrowUpRight, Lock, User, Mail } from 'lucide-react'
+import { signUp, logIn, demoLogin } from '@/features/auth/actions'
+import { Terminal, ArrowUpRight, Lock, User, Mail, Zap } from 'lucide-react'
 
 export default function AuthPage() {
   const router = useRouter()
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  async function handleDemoLogin() {
+    setIsSubmitting(true)
+    setErrorMsg(null)
+    const res = await demoLogin()
+    setIsSubmitting(false)
+    if (res?.error) {
+      setErrorMsg(res.error)
+    } else {
+      router.push('/quests')
+      router.refresh()
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -152,7 +165,19 @@ export default function AuthPage() {
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-[#293033] text-center text-[10px] text-[#4d5758] font-mono">
+        <div className="mt-4 pt-4 border-t border-[#293033]">
+          <button
+            type="button"
+            onClick={handleDemoLogin}
+            disabled={isSubmitting}
+            className="w-full py-2.5 px-3 bg-[#171b1d] border border-[#3b4447] hover:border-[#d7a646] hover:bg-[#20272a] text-[#c6cbcd] font-mono text-[11px] tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer"
+          >
+            <Zap size={14} className="text-amber-400" />
+            <span>DEMO OPERATOR QUICK ACCESS (BYPASS RATE LIMIT)</span>
+          </button>
+        </div>
+
+        <div className="mt-6 pt-4 border-t border-[#293033] text-center text-[10px] text-[#4d5758] font-mono">
           SERVER AUTHORITATIVE SECURITY SYSTEM • NO CLIENT TAMPERING
         </div>
       </main>
