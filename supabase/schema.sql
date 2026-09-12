@@ -77,8 +77,12 @@ CREATE TABLE IF NOT EXISTS public.task_completions (
   gold_awarded INTEGER NOT NULL,
   attribute_stat_awarded INTEGER NOT NULL,
   completed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  completion_date DATE NOT NULL DEFAULT CURRENT_DATE
+  completion_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  UNIQUE(task_id)
 );
+
+ALTER TABLE public.task_completions DROP CONSTRAINT IF EXISTS task_completions_task_id_key;
+ALTER TABLE public.task_completions ADD CONSTRAINT task_completions_task_id_key UNIQUE (task_id);
 
 -- ------------------------------------------
 -- 5. ITEMS CATALOG TABLE (ARMORY SHOP)
@@ -288,10 +292,10 @@ ON CONFLICT DO NOTHING;
 -- ATOMIC STORED PROCEDURES (RACE CONDITION PROOF)
 -- ==========================================
 
-CREATE OR REPLACE FUNCTION public.complete_quest_rpc(p_task_id UUID)
+CREATE OR REPLACE FUNCTION public.complete_quest_rpc(p_task_id UUID, p_user_id UUID DEFAULT NULL)
 RETURNS JSONB AS $$
 DECLARE
-  v_user_id UUID := auth.uid();
+  v_user_id UUID := COALESCE(p_user_id, auth.uid());
   v_task public.tasks%ROWTYPE;
   v_char public.characters%ROWTYPE;
   v_xp_gained INT;
@@ -416,10 +420,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE OR REPLACE FUNCTION public.purchase_item_rpc(p_item_id UUID)
+CREATE OR REPLACE FUNCTION public.purchase_item_rpc(p_item_id UUID, p_user_id UUID DEFAULT NULL)
 RETURNS JSONB AS $$
 DECLARE
-  v_user_id UUID := auth.uid();
+  v_user_id UUID := COALESCE(p_user_id, auth.uid());
   v_item public.items%ROWTYPE;
   v_char public.characters%ROWTYPE;
   v_inv_id UUID;

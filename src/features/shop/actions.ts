@@ -48,7 +48,7 @@ export async function purchaseItem(itemId: string): Promise<ItemPurchaseResult> 
   // 1. Attempt atomic RPC call first
   const { data: rpcResult, error: rpcError } = await supabase.rpc(
     'purchase_item_rpc' as unknown as 'purchase_item_rpc',
-    { p_item_id: itemId } as unknown as { p_item_id: string }
+    { p_item_id: itemId, p_user_id: user.id } as unknown as { p_item_id: string }
   )
 
   if (!rpcError && rpcResult) {

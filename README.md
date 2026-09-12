@@ -8,11 +8,12 @@ LIFE//OS is a full-stack, production-quality RPG character operating system that
 ## 🌟 Product Highlights & Key Features
 
 - **Authentic RPG OS Identity:** Built with a dark tactical palette (`#0b0d0f`, `#d7a646` muted gold, CRT scanlines, IBM Plex Mono & DM Sans typography).
+- **Custom Application Auth Architecture:** Hardened password hashing using Node.js `crypto.scrypt`, signed HTTP-only session cookies (`life_os_session`), and fail-closed security.
 - **Server-Authoritative Progression:** Zero client trust. XP, Gold, Level Ups, Attributes, and Prices are calculated strictly on the server or inside PostgreSQL RPC functions.
 - **7-Archetype Class Classifier:** Deterministic character build engine evaluating *The Builder*, *The Scholar*, *The Warrior*, *The Creator*, *The Disciplined*, *The Strategist*, and *The Balanced*.
 - **Quest Board & Campaign Chains:** Real-world task management with difficulty tiers (`Easy`, `Medium`, `Hard`, `Epic`), attribute alignments, and multi-stage campaign chains.
 - **Armory Shop & Inventory:** Purchase interface themes, avatar frames, and particle effects using earned Gold.
-- **Atomic Database Integrity:** Race-condition-proof stored procedures (`complete_quest_rpc`, `purchase_item_rpc`) with Postgres row locks (`FOR UPDATE`) and Supabase RLS.
+- **Atomic Database Integrity:** Race-condition-proof stored procedures (`complete_quest_rpc`, `purchase_item_rpc`) with Postgres row locks (`FOR UPDATE`) and unique task completion constraints.
 
 ---
 
@@ -23,10 +24,10 @@ LIFE//OS is a full-stack, production-quality RPG character operating system that
            | Next.js 16 App Router (TypeScript, React 19)|
            +----------------------+----------------------+
                                   |
-               Server Actions &   | Auth SSR Cookies
-               Domain Engine      v
+                Server Actions &   | HTTP-Only Signed Session Cookies
+                Custom Auth Engine v
            +---------------------------------------------+
-           |           Supabase Postgres & Auth          |
+           |           Supabase PostgreSQL               |
            | (RLS Enabled, Triggers, Atomic RPC Functions)|
            +---------------------------------------------+
 ```
@@ -34,7 +35,7 @@ LIFE//OS is a full-stack, production-quality RPG character operating system that
 - **Framework:** Next.js 16 (App Router, Server Actions)
 - **Language:** TypeScript
 - **Styling & Motion:** Tailwind CSS + Framer Motion + Lucide Icons
-- **Database & Auth:** Supabase SSR (Auth, PostgreSQL, Row Level Security)
+- **Database:** Supabase PostgreSQL + Stored Procedures
 
 ---
 
@@ -43,8 +44,17 @@ LIFE//OS is a full-stack, production-quality RPG character operating system that
 Create a `.env.local` file in the root directory:
 
 ```env
+# Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=https://your-supabase-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-anon-key
+SUPABASE_SECRET_KEY=your-supabase-service-role-or-secret-key
+
+# Direct DB Connection for migrations
+DATABASE_URL=postgresql://postgres:your-password@db.your-supabase-project.supabase.co:5432/postgres
+
+# Custom Auth Session Secret (Required - fail closed)
+LIFEOS_SESSION_SECRET=replace_with_a_secure_random_64_char_hex_secret
 ```
 
 ---
@@ -88,8 +98,8 @@ npm run build
 
 ## 🕹️ Demo Journey Walkthrough
 
-1. **Sign Up (`/auth`):** Register a new operator profile. Auto-creates Level 1 character with 10 points across all attributes.
-2. **Quest Board (`/quests`):** Create a quest (e.g., *Build Login API*, Hard, Intellect). Click **COMPLETE**. Experience authoritative XP, Gold, Intellect stat gain, floating reward badge, and audio-visual celebration.
+1. **Sign Up (`/auth`):** Register a new operator profile. Auto-creates Level 1 character with 10 points across all attributes and 0 streaks/momentum.
+2. **Quest Board (`/quests`):** Create a quest (e.g., *Build Login API*, Hard, Intellect). Click **COMPLETE**. Experience authoritative XP, Gold, Intellect stat gain, floating reward badge, and celebration.
 3. **Character Command Center (`/character`):** View your stat radar distribution, XP orbit ring, and click **REFLECT ON THIS BUILD** to see your deterministic build trajectory dialog.
 4. **Armory Shop (`/shop`):** Spend earned Gold to unlock cosmetic themes or frames and view them persist in your inventory grid.
 5. **Quest Chains (`/chains`):** Create a multi-step campaign path (*The Developer's Path*) and track your progress.

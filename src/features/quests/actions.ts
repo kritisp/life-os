@@ -129,7 +129,7 @@ export async function completeQuest(taskId: string): Promise<QuestCompletionResu
   // 1. Attempt atomic database RPC function first
   const { data: rpcResult, error: rpcError } = await supabase.rpc(
     'complete_quest_rpc' as unknown as 'complete_quest_rpc',
-    { p_task_id: taskId } as unknown as { p_task_id: string }
+    { p_task_id: taskId, p_user_id: user.id } as unknown as { p_task_id: string }
   )
 
   if (!rpcError && rpcResult) {

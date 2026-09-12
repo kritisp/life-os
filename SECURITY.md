@@ -1,38 +1,54 @@
 # LIFE//OS — Security Architecture & Threat Model
 
-## 1. Core Security Tenets
+## 1. Custom Application Authentication Architecture
 
-1. **Zero Client Trust:** The browser frontend is considered an untrusted interface. All domain actions (quest completion, item purchases, stat leveling) must be validated server-side.
-2. **Strict Identity Isolation:** Row Level Security (RLS) policies mandate that authenticated users can only query, update, or delete their own data.
-3. **Least Privilege Credentials:** The application exclusively uses standard publishable/anon Supabase credentials (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`). Service-role administrative keys are **never** bundled or exposed.
-4. **Input Hygiene & Error Masking:** All incoming parameters are validated before execution. Database error stack traces are suppressed and replaced with sanitized user messages.
+LIFE//OS operates on a secure, server-authoritative **Custom Application Authentication Architecture**:
+
+```
+Browser (User UI)
+      │
+      ▼  (HTTP-only, Secure, SameSite=Lax Cookie: life_os_session)
+Next.js Server Action / Route Handler
+      │
+      ├─► 1. Verify Signed Session Token (HMAC-SHA256 via LIFEOS_SESSION_SECRET)
+      ├─► 2. Extract Authenticated User Identity (user.id)
+      │
+      ▼  (p_user_id passed securely from validated session)
+PostgreSQL Database / Atomic RPCs (tasks, characters, inventory)
+```
+
+### Core Security Guarantees
+1. **Zero Browser DB Access:** The browser client is completely isolated from the database. All reads, mutations, and game transactions are executed via Next.js Server Actions.
+2. **Fail-Closed Session Architecture:** `LIFEOS_SESSION_SECRET` is strictly required at runtime. If absent, the server fails closed, preventing session operations with weak or fallback keys.
+3. **Hardened Password Hashing:** Passwords are hashed using Node.js `crypto.scryptSync` (64-byte key output) with a 16-byte cryptographic random salt. Password verification is performed using `crypto.timingSafeEqual` to eliminate timing side-channel attacks.
+4. **Session Cookie Isolation:** Session tokens are transmitted exclusively inside `HttpOnly`, `SameSite=Lax`, and `Secure` (in production) cookies named `life_os_session`.
 
 ---
 
 ## 2. Server-Authoritative Progression Security
 
 ### Quest Completion Verification Checklist
-When a user triggers a quest completion request:
+When a user completes a quest:
 
 ```
-[ Client Action: submitCompletion(taskId) ]
+[ Client Action: completeQuest(taskId) ]
                      │
                      ▼
 ┌───────────────────────────────────────────────────────────┐
 │              SERVER ACTION VALIDATION FLOW                │
 ├───────────────────────────────────────────────────────────┤
-│ 1. Verify Session    ──► Reject if unauthenticated        │
-│ 2. Verify Ownership  ──► Check tasks.user_id = user.id    │
-│ 3. Check Eligibility ──► Ensure task is active & valid    │
-│ 4. Prevent Duplicate ──► Enforce rate / duplicate rules   │
-│ 5. Calculate Rewards ──► Server calculates XP/Gold/Stats │
-│ 6. Commit Database   ──► Atomic PostgreSQL Transaction    │
+│ 1. Verify Session    ──► Extract user.id from cookie      │
+│ 2. Call Atomic RPC   ──► complete_quest_rpc(taskId, uid)  │
+│ 3. Row-Level Locks   ──► SELECT ... FOR UPDATE tasks/char │
+│ 4. Verify Ownership  ──► Check tasks.user_id = uid        │
+│ 5. Duplicate Guard   ──► UNIQUE(task_id) constraint       │
+│ 6. Reward & Level-Up ──► Computed server-side in Postgres │
 └───────────────────────────────────────────────────────────┘
 ```
 
-- **Client Input:** The client passes **only** the `taskId`.
-- **Server Calculation:** The server fetches the quest's difficulty & attribute from the database, computes XP, Gold, and attribute gains, recalculates the level threshold, updates streaks, and commits the completion log.
-- **Client Manipulation Defense:** Attempts to pass modified `xp`, `gold`, or `level` values in request payloads are completely ignored or rejected.
+- **Client Input:** The client passes **only** the `taskId`. The user ID is extracted from the verified session.
+- **Server Calculation:** The server/RPC fetches the quest's difficulty & attribute from the database, computes XP, Gold, and attribute gains, recalculates the level threshold, updates streaks, and commits the completion log.
+- **Race Condition Immunity:** `public.task_completions` enforces a `UNIQUE(task_id)` constraint, preventing duplicate completions even under concurrent requests.
 
 ---
 
@@ -41,61 +57,47 @@ When a user triggers a quest completion request:
 ### Item Purchase Verification
 When a user attempts to buy an item from the armory:
 
-1. **Server Balance Fetch:** The server reads `characters.gold` for `auth.uid()`.
-2. **Server Price Fetch:** The server reads `items.price` directly from the authoritative `items` table.
-3. **Sufficient Funds Check:** Rejects purchase if `character.gold < item.price`.
-4. **Duplicate Ownership Check:** Rejects purchase if an entry for `(user_id, item_id)` already exists in `inventory`.
-5. **Atomic Purchase Execution:** 
+1. **Session Authorization:** Server validates `life_os_session` cookie and extracts `user.id`.
+2. **Atomic RPC Execution:** Calls `purchase_item_rpc(itemId, user.id)`.
+3. **Server Price & Balance Fetch:** Server locks the character row and reads `items.price` directly from the authoritative catalog.
+4. **Sufficient Funds Check:** Rejects purchase if `character.gold < item.price`.
+5. **Duplicate Ownership Check:** Rejects purchase if an entry for `(user_id, item_id)` already exists in `inventory`.
+6. **Atomic Mutation:** 
    - Deducts `item.price` from `characters.gold`.
    - Inserts row into `inventory`.
-   - Performed within an atomic database RPC function or Server Action transaction.
+   - Returns remaining gold and inventory record atomically.
 
 ---
 
-## 4. Row Level Security (RLS) Policy Blueprint
+## 4. Server-Side Data Scoping
 
-Every table enforces RLS. Example policy definitions:
+Every database query in server actions explicitly filters on `authenticatedUser.id`:
 
-```sql
--- Enable RLS on all tables
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE characters ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE task_completions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE inventory ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_achievements ENABLE ROW LEVEL SECURITY;
-
--- 1. Profiles Policy
-CREATE POLICY "Users access own profile" ON profiles
-  FOR ALL USING (id = auth.uid());
-
--- 2. Characters Policy
-CREATE POLICY "Users read own character" ON characters
-  FOR SELECT USING (user_id = auth.uid());
-
--- 3. Tasks Policy
-CREATE POLICY "Users manage own tasks" ON tasks
-  FOR ALL USING (user_id = auth.uid());
-
--- 4. Items Catalog Policy
-CREATE POLICY "Authenticated users view shop items" ON items
-  FOR SELECT TO authenticated USING (true);
+```typescript
+// Explicit user ID scoping on all queries
+const { data: tasks } = await supabase
+  .from('tasks')
+  .select('*')
+  .eq('user_id', user.id)
+  .order('created_at', { ascending: false })
 ```
 
 ---
 
 ## 5. Defense Against Common Web Vulnerabilities
 
-- **Cross-Site Scripting (XSS):** Next.js automatically escapes React components. User input (quest titles, descriptions) is sanitized prior to rendering.
-- **Cross-Site Request Forgery (CSRF):** Server Actions utilize Next.js's built-in CSRF protection header tokens.
-- **SQL Injection:** Supabase client uses parameterized queries exclusively. Raw string interpolation in SQL queries is strictly prohibited.
-- **Session Hijacking:** Auth tokens stored in `SameSite=Lax`, `HttpOnly`, `Secure` cookies managed by `@supabase/ssr`.
+- **Cross-Site Scripting (XSS):** React / Next.js auto-escapes UI rendering. Quest titles, descriptions, and user inputs are strictly sanitized.
+- **Cross-Site Request Forgery (CSRF):** Server Actions utilize Next.js built-in CSRF header protection.
+- **Timing Attacks:** Password hash and HMAC signature comparisons use `crypto.timingSafeEqual`.
+- **SQL Injection:** Parameterized queries and stored procedures protect all SQL operations.
+- **Session Hijacking:** Cryptographically signed session tokens with 7-day expiration and HTTP-only cookie flags.
 
 ---
 
 ## 6. Environment & Secret Management
 
-- `NEXT_PUBLIC_SUPABASE_URL`: Safe for client exposure.
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: Safe for client exposure (restricted by RLS).
-- **Service Role Keys:** Explicitly prohibited from frontend or server codebase.
-- **Git Safety:** `.env.local` ignored by default; `.env.example` provides non-sensitive template documentation.
+- `LIFEOS_SESSION_SECRET`: Cryptographically strong secret required for HMAC session signing (fail-closed).
+- `SUPABASE_SECRET_KEY`: Server-only key for backend database interactions.
+- `DATABASE_URL`: Direct PostgreSQL connection string for running migrations.
+- `NEXT_PUBLIC_SUPABASE_URL`: Public endpoint for client connectivity.
+- **Git Safety:** `.env.local` is strictly excluded in `.gitignore`.

@@ -59,7 +59,7 @@ export async function signUp(formData: FormData) {
     return { error: sanitizeErrorMessage(profileError) }
   }
 
-  // Insert initial character row into database
+  // Insert initial character row with exact Level 1 defaults
   await supabase.from('characters').insert({
     user_id: userId,
     name: displayName,
@@ -71,10 +71,11 @@ export async function signUp(formData: FormData) {
     discipline: 10,
     vitality: 10,
     creativity: 10,
-    current_streak: 1,
-    longest_streak: 1,
-    momentum: 100,
+    current_streak: 0,
+    longest_streak: 0,
+    momentum: 0,
     archetype: 'The Balanced',
+    last_active_date: null,
   } as CharacterRow)
 
   // Establish HTTP-only session cookie
@@ -108,7 +109,7 @@ export async function logIn(formData: FormData) {
     return { error: 'Invalid email or password' }
   }
 
-  // Verify PBKDF2 password hash
+  // Verify scrypt password hash
   const isValid = verifyPassword(password, profile.password_hash)
   if (!isValid) {
     return { error: 'Invalid email or password' }
@@ -140,10 +141,11 @@ export async function logIn(formData: FormData) {
       discipline: 10,
       vitality: 10,
       creativity: 10,
-      current_streak: 1,
-      longest_streak: 1,
-      momentum: 100,
+      current_streak: 0,
+      longest_streak: 0,
+      momentum: 0,
       archetype: 'The Balanced',
+      last_active_date: null,
     } as CharacterRow)
   }
 

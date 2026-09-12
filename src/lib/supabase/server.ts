@@ -6,12 +6,14 @@ export async function createClient() {
   const cookieStore = await cookies()
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-  const supabaseAnonKey =
+  const supabaseKey =
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
     ''
 
-  return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+  return createServerClient<Database>(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll()
@@ -22,8 +24,7 @@ export async function createClient() {
             cookieStore.set(name, value, options)
           )
         } catch {
-          // The `setAll` method was called from a Server Component.
-          // This can be safely ignored if middleware refreshes user sessions.
+          // Server component context cookie sync
         }
       },
     },
