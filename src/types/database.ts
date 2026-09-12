@@ -6,7 +6,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       profiles: {
@@ -34,6 +34,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
       characters: {
         Row: {
@@ -96,6 +97,15 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "characters_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       tasks: {
         Row: {
@@ -106,6 +116,7 @@ export interface Database {
           category: string
           difficulty: 'easy' | 'medium' | 'hard' | 'epic'
           attribute: 'strength' | 'intellect' | 'discipline' | 'vitality' | 'creativity'
+          status: 'active' | 'completed' | 'archived'
           base_xp: number
           base_gold: number
           is_archived: boolean
@@ -120,6 +131,7 @@ export interface Database {
           category: string
           difficulty: 'easy' | 'medium' | 'hard' | 'epic'
           attribute: 'strength' | 'intellect' | 'discipline' | 'vitality' | 'creativity'
+          status?: 'active' | 'completed' | 'archived'
           base_xp: number
           base_gold: number
           is_archived?: boolean
@@ -134,12 +146,22 @@ export interface Database {
           category?: string
           difficulty?: 'easy' | 'medium' | 'hard' | 'epic'
           attribute?: 'strength' | 'intellect' | 'discipline' | 'vitality' | 'creativity'
+          status?: 'active' | 'completed' | 'archived'
           base_xp?: number
           base_gold?: number
           is_archived?: boolean
           created_at?: string
           updated_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       task_completions: {
         Row: {
@@ -172,6 +194,22 @@ export interface Database {
           completed_at?: string
           completion_date?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "task_completions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_completions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       items: {
         Row: {
@@ -179,6 +217,7 @@ export interface Database {
           name: string
           description: string
           category: 'theme' | 'badge' | 'frame' | 'effect'
+          rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'
           price: number
           asset_url: string | null
           metadata: Json
@@ -189,6 +228,7 @@ export interface Database {
           name: string
           description: string
           category: 'theme' | 'badge' | 'frame' | 'effect'
+          rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'
           price: number
           asset_url?: string | null
           metadata?: Json
@@ -199,11 +239,13 @@ export interface Database {
           name?: string
           description?: string
           category?: 'theme' | 'badge' | 'frame' | 'effect'
+          rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'
           price?: number
           asset_url?: string | null
           metadata?: Json
           created_at?: string
         }
+        Relationships: []
       }
       inventory: {
         Row: {
@@ -227,6 +269,22 @@ export interface Database {
           is_equipped?: boolean
           purchased_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       achievements: {
         Row: {
@@ -259,6 +317,7 @@ export interface Database {
           gold_reward?: number
           created_at?: string
         }
+        Relationships: []
       }
       user_achievements: {
         Row: {
@@ -279,6 +338,22 @@ export interface Database {
           achievement_id?: string
           unlocked_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_achievements_achievement_id_fkey"
+            columns: ["achievement_id"]
+            isOneToOne: false
+            referencedRelation: "achievements"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       quest_chains: {
         Row: {
@@ -302,6 +377,15 @@ export interface Database {
           description?: string | null
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "quest_chains_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       quest_chain_tasks: {
         Row: {
@@ -322,7 +406,42 @@ export interface Database {
           task_id?: string
           step_order?: number
         }
+        Relationships: [
+          {
+            foreignKeyName: "quest_chain_tasks_chain_id_fkey"
+            columns: ["chain_id"]
+            isOneToOne: false
+            referencedRelation: "quest_chains"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quest_chain_tasks_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          }
+        ]
       }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      complete_quest_rpc: {
+        Args: { p_task_id: string }
+        Returns: Json
+      }
+      purchase_item_rpc: {
+        Args: { p_item_id: string }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
     }
   }
 }

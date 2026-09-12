@@ -2,7 +2,9 @@ import { Database } from './database'
 
 export type AttributeType = 'strength' | 'intellect' | 'discipline' | 'vitality' | 'creativity'
 export type QuestDifficulty = 'easy' | 'medium' | 'hard' | 'epic'
+export type QuestStatus = 'active' | 'completed' | 'archived'
 export type ItemCategory = 'theme' | 'badge' | 'frame' | 'effect'
+export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'
 
 export type Archetype =
   | 'The Builder'
@@ -24,21 +26,34 @@ export type UserAchievementRow = Database['public']['Tables']['user_achievements
 export type QuestChainRow = Database['public']['Tables']['quest_chains']['Row']
 export type QuestChainTaskRow = Database['public']['Tables']['quest_chain_tasks']['Row']
 
+export interface BuildInfo {
+  name: Archetype
+  description: string
+}
+
 export interface QuestCompletionResult {
   success: boolean
   xpGained: number
   goldGained: number
-  statGained: {
-    attribute: AttributeType
-    amount: number
-  }
-  levelUp: {
-    didLevelUp: boolean
-    previousLevel: number
-    newLevel: number
-  }
-  newStreak: number
-  newMomentum: number
+  attributeGained: number
+  attributeName: AttributeType
+  previousLevel: number
+  newLevel: number
+  didLevelUp: boolean
+  currentXp: number
+  xpRequiredForNextLevel: number
+  currentStreak: number
+  longestStreak: number
+  momentum: number
+  build: BuildInfo
+  newlyUnlockedAchievements: AchievementRow[]
+}
+
+export interface ItemPurchaseResult {
+  success: boolean
+  remainingGold: number
+  inventoryItem: InventoryRow
+  unlockedAchievement?: AchievementRow
 }
 
 export interface ServiceResult<T> {
