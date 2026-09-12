@@ -35,6 +35,10 @@ export async function createTask(formData: FormData) {
     return { error: 'Quest title is required' }
   }
 
+  if (title.length > 200) {
+    return { error: 'Quest title must be 200 characters or fewer' }
+  }
+
   if (!['easy', 'medium', 'hard', 'epic'].includes(difficulty)) {
     return { error: 'Invalid difficulty tier' }
   }

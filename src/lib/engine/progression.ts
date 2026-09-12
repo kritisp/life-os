@@ -44,6 +44,15 @@ export function getXpProgress(totalXp: number): {
 
 /**
  * Deterministically classifies character build archetype based on attribute distribution.
+ *
+ * Model rules:
+ * - The Builder: strong Intellect + Creativity
+ * - The Strategist: strong Intellect + Discipline
+ * - The Scholar: dominant Intellect
+ * - The Warrior: dominant Strength
+ * - The Creator: dominant Creativity
+ * - The Disciplined: dominant Discipline
+ * - The Balanced: relatively even distribution across all attributes
  */
 export function calculateArchetype(stats: {
   strength: number
@@ -53,41 +62,60 @@ export function calculateArchetype(stats: {
   creativity: number
 }): BuildInfo {
   const { strength, intellect, discipline, vitality, creativity } = stats
+  const values = [strength, intellect, discipline, vitality, creativity]
+  const maxVal = Math.max(...values)
+  const minVal = Math.min(...values)
+  const total = values.reduce((a, b) => a + b, 0)
 
-  if (intellect >= 30 && creativity >= 30 && intellect >= strength) {
+  // 1. Balanced: Even distribution
+  if (maxVal - minVal <= 5 && total < 80) {
+    return {
+      name: 'The Balanced',
+      description: 'Versatile operator developing across all core attributes',
+    }
+  }
+
+  // 2. Dual Attributes (Builder & Strategist)
+  if (intellect >= maxVal - 3 && creativity >= maxVal - 3 && intellect > strength) {
     return {
       name: 'The Builder',
       description: 'Master of technical architecture and creative systems',
     }
   }
-  if (intellect >= 30 && discipline >= 30) {
+
+  if (intellect >= maxVal - 3 && discipline >= maxVal - 3) {
+    return {
+      name: 'The Strategist',
+      description: 'Tactical planner balancing analytical foresight with execution',
+    }
+  }
+
+  // 3. Dominant Single Attributes
+  if (intellect === maxVal) {
     return {
       name: 'The Scholar',
       description: 'Relentless seeker of deep knowledge and systematic mastery',
     }
   }
-  if (strength >= 30 && vitality >= 30) {
+
+  if (strength === maxVal) {
     return {
       name: 'The Warrior',
       description: 'Unstoppable physical titan powered by endurance and strength',
     }
   }
-  if (creativity >= 30 && discipline >= 25) {
+
+  if (creativity === maxVal) {
     return {
       name: 'The Creator',
       description: 'Prolific artisan transforming ideas into disciplined output',
     }
   }
-  if (discipline >= 40) {
+
+  if (discipline === maxVal) {
     return {
       name: 'The Disciplined',
       description: 'Monk-like operator defined by unwavering habit adherence',
-    }
-  }
-  if (intellect >= 25 && strength >= 25 && discipline >= 25) {
-    return {
-      name: 'The Strategist',
-      description: 'Tactical polymath balancing mental acuity with physical force',
     }
   }
 

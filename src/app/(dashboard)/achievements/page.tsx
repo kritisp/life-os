@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { Trophy, Flame, Swords, Zap, Award, ShieldAlert, ShoppingBag } from 'lucide-react'
 import { getAchievements } from '@/features/achievements/actions'
+import { StaggerContainer, StaggerItem, AnimatedNumber } from '@/components/ui/Motion'
 
 interface AchievementItem {
   id: string
@@ -53,20 +54,22 @@ export default function AchievementsPage() {
   const unlockedCount = achievements.filter((a) => a.isUnlocked).length
 
   return (
-    <>
-      <div className="hero-heading">
-        <div>
-          <p className="eyebrow">
-            PROOF OF WORK · {unlockedCount} / {achievements.length} UNLOCKED
-          </p>
-          <h1>
-            LEAVE A <em>TRACE.</em>
-          </h1>
+    <StaggerContainer className="space-y-6">
+      <StaggerItem>
+        <div className="hero-heading">
+          <div>
+            <p className="eyebrow">
+              PROOF OF WORK · {unlockedCount} / {achievements.length} UNLOCKED
+            </p>
+            <h1>
+              LEAVE A <em>TRACE.</em>
+            </h1>
+          </div>
+          <div className="quick-add">
+            <Trophy size={15} /> MILESTONE MATRIX
+          </div>
         </div>
-        <div className="quick-add">
-          <Trophy size={15} /> MILESTONE MATRIX
-        </div>
-      </div>
+      </StaggerItem>
 
       {loading ? (
         <div className="p-12 text-center text-xs font-mono text-[#7b8586] border border-[#293033] bg-[#111416]">
@@ -79,44 +82,51 @@ export default function AchievementsPage() {
               const IconComponent = getBadgeIcon(ach.badge_icon)
 
               return (
-                <article
-                  key={ach.id}
-                  className={`panel achievement-card ${ach.isUnlocked ? 'unlocked' : ''}`}
-                >
-                  <span className="achievement-icon">
-                    <IconComponent size={21} />
-                  </span>
+                <StaggerItem key={ach.id}>
+                  <article
+                    className={`panel achievement-card ${ach.isUnlocked ? 'unlocked' : ''}`}
+                  >
+                    <span className="achievement-icon">
+                      <IconComponent size={21} />
+                    </span>
 
-                  <div>
-                    <p className="eyebrow">{ach.isUnlocked ? 'UNLOCKED' : 'LOCKED'}</p>
-                    <h2>{ach.title.toUpperCase()}</h2>
-                    <p>{ach.description}</p>
-                  </div>
+                    <div>
+                      <p className="eyebrow">{ach.isUnlocked ? 'UNLOCKED' : 'LOCKED'}</p>
+                      <h2>{ach.title.toUpperCase()}</h2>
+                      <p>{ach.description}</p>
+                    </div>
 
-                  <strong>
-                    {ach.isUnlocked && ach.unlockedAt
-                      ? `UNLOCKED ON ${new Date(ach.unlockedAt).toLocaleDateString()}`
-                      : 'IN PROGRESS'}
-                  </strong>
-                </article>
+                    <strong>
+                      {ach.isUnlocked && ach.unlockedAt
+                        ? `UNLOCKED ON ${new Date(ach.unlockedAt).toLocaleDateString()}`
+                        : 'IN PROGRESS'}
+                    </strong>
+                  </article>
+                </StaggerItem>
               )
             })}
           </section>
 
           <aside className="achievement-score panel">
-            <Trophy size={25} />
-            <p className="eyebrow">TOTAL UNLOCKED SCORE</p>
-            <strong>{unlockedCount * 250}</strong>
-            <span>ACHIEVEMENT XP POINTS</span>
+            <StaggerItem>
+              <Trophy size={25} className="text-[#d7a646]" />
+              <p className="eyebrow mt-3">TOTAL UNLOCKED SCORE</p>
+              <strong className="text-3xl font-mono text-[#e7e8e4] block my-1">
+                <AnimatedNumber value={unlockedCount * 250} />
+              </strong>
+              <span className="text-xs font-mono text-[#7b8586]">ACHIEVEMENT XP POINTS</span>
 
-            <div className="aside-rule" />
+              <div className="aside-rule" />
 
-            <p className="eyebrow">NEXT MILESTONE UNLOCK</p>
-            <h3>STREAK ENGINE</h3>
-            <p>Maintain an active quest streak for 7 consecutive days to claim Unstoppable Force.</p>
+              <p className="eyebrow">NEXT MILESTONE UNLOCK</p>
+              <h3 className="font-mono text-sm text-[#e7e8e4] my-1">STREAK ENGINE</h3>
+              <p className="text-xs font-mono text-[#7b8586]">
+                Maintain an active quest streak for 7 consecutive days to claim Unstoppable Force.
+              </p>
+            </StaggerItem>
           </aside>
         </div>
       )}
-    </>
+    </StaggerContainer>
   )
 }

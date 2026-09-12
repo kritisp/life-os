@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { motion } from 'framer-motion'
 import {
   Shield,
   Target,
@@ -14,9 +15,11 @@ import {
   Menu,
   Gem,
   LogOut,
+  X,
 } from 'lucide-react'
 import { logOut } from '@/features/auth/actions'
 import { CharacterRow } from '@/types'
+import { AnimatedNumber } from '@/components/ui/Motion'
 
 interface NavigationProps {
   character: CharacterRow | null
@@ -44,13 +47,24 @@ export function Navigation({ character, userEmail }: NavigationProps) {
 
   return (
     <>
+      {/* Desktop & Open Mobile Sidebar */}
       <aside className={`sidebar ${showMobileNav ? 'mobile-open' : ''}`}>
-        <Link href="/character" className="brand" onClick={() => setShowMobileNav(false)}>
-          <span className="brand-mark">L</span>
-          <span>
-            LIFE<span className="brand-slash">{'//'}</span>OS
-          </span>
-        </Link>
+        <div className="flex justify-between items-center pr-2 md:block">
+          <Link href="/character" className="brand" onClick={() => setShowMobileNav(false)}>
+            <span className="brand-mark">L</span>
+            <span>
+              LIFE<span className="brand-slash">{'//'}</span>OS
+            </span>
+          </Link>
+
+          <button
+            className="md:hidden text-[#7b8586] hover:text-[#e7e8e4] p-1"
+            onClick={() => setShowMobileNav(false)}
+            aria-label="Close menu"
+          >
+            <X size={20} />
+          </button>
+        </div>
 
         <div className="side-label">OPERATING SYSTEM</div>
 
@@ -61,11 +75,22 @@ export function Navigation({ character, userEmail }: NavigationProps) {
               <Link
                 key={label}
                 href={href}
-                className={`nav-item ${isActive ? 'active' : ''}`}
+                className={`nav-item relative group ${isActive ? 'active' : ''}`}
                 onClick={() => setShowMobileNav(false)}
               >
-                <Icon size={17} strokeWidth={1.8} />
-                <span>{label}</span>
+                {isActive && (
+                  <motion.div
+                    layoutId="activeNavIndicator"
+                    className="absolute inset-0 bg-[#181d1e] rounded-[4px] border-l-2 border-[#d7a646] -z-10"
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <Icon
+                  size={17}
+                  strokeWidth={1.8}
+                  className="transition-transform duration-150 group-hover:scale-110"
+                />
+                <span className="font-mono">{label}</span>
                 {isActive && <ChevronRight size={14} className="nav-arrow" />}
               </Link>
             )
@@ -75,7 +100,7 @@ export function Navigation({ character, userEmail }: NavigationProps) {
         <div className="sidebar-bottom">
           <div className="side-label">SYSTEM STATUS</div>
           <div className="status-line">
-            <CircleDot size={12} />
+            <CircleDot size={12} className="animate-pulse text-emerald-500" />
             <span>Server Authoritative • Online</span>
           </div>
           <div className="version">
@@ -84,6 +109,7 @@ export function Navigation({ character, userEmail }: NavigationProps) {
         </div>
       </aside>
 
+      {/* Top Bar */}
       <header className="topbar">
         <button
           className="mobile-menu"
@@ -101,20 +127,24 @@ export function Navigation({ character, userEmail }: NavigationProps) {
 
         <div className="top-actions">
           <div className="gold-chip">
-            <Gem size={14} />
-            <span>{character?.gold ?? 0} GOLD</span>
+            <Gem size={14} className="text-[#d7a646]" />
+            <AnimatedNumber
+              value={character?.gold ?? 0}
+              suffix=" GOLD"
+              className="font-mono font-semibold"
+            />
           </div>
 
           <div className="profile-chip">
             <span className="avatar">{initials}</span>
-            <span className="profile-name">{displayName.toUpperCase()}</span>
+            <span className="profile-name hidden sm:inline">{displayName.toUpperCase()}</span>
             <span className="online-dot" />
           </div>
 
           <form action={logOut}>
             <button
               type="submit"
-              className="icon-button"
+              className="icon-button hover:text-[#d7a646] transition-colors"
               title="Sign out of LIFE//OS"
               aria-label="Sign out"
             >
