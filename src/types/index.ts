@@ -26,6 +26,14 @@ export type UserAchievementRow = Database['public']['Tables']['user_achievements
 export type QuestChainRow = Database['public']['Tables']['quest_chains']['Row']
 export type QuestChainTaskRow = Database['public']['Tables']['quest_chain_tasks']['Row']
 
+export type QuestChainWithDetails = QuestChainRow & {
+  tasks: TaskRow[]
+  totalSteps: number
+  completedSteps: number
+  currentStage: number
+  isCompleted: boolean
+}
+
 export interface BuildInfo {
   name: Archetype
   description: string
