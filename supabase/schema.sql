@@ -228,38 +228,36 @@ DROP POLICY IF EXISTS "Public quest chain tasks access" ON public.quest_chain_ta
 CREATE POLICY "Public quest chains access" ON public.quest_chains FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Public quest chain tasks access" ON public.quest_chain_tasks FOR ALL USING (true) WITH CHECK (true);
 
--- ==========================================
--- AUTOMATIC PROFILE & CHARACTER CREATION TRIGGER
--- ==========================================
-
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
+DO $$
 BEGIN
-  INSERT INTO public.profiles (id, username, display_name, avatar_url)
-  VALUES (
-    NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'username', split_part(NEW.email, '@', 1)),
-    COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1)),
-    NEW.raw_user_meta_data->>'avatar_url'
-  );
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'auth' AND table_name = 'users') THEN
+    CREATE OR REPLACE FUNCTION public.handle_new_user()
+    RETURNS TRIGGER AS $func$
+    BEGIN
+      INSERT INTO public.profiles (id, username, display_name, avatar_url)
+      VALUES (
+        NEW.id,
+        COALESCE(NEW.raw_user_meta_data->>'username', split_part(NEW.email, '@', 1)),
+        COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1)),
+        NEW.raw_user_meta_data->>'avatar_url'
+      ) ON CONFLICT (id) DO NOTHING;
 
-  INSERT INTO public.characters (user_id, name)
-  VALUES (
-    NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'display_name', 'Operator')
-  );
+      INSERT INTO public.characters (user_id, name)
+      VALUES (
+        NEW.id,
+        COALESCE(NEW.raw_user_meta_data->>'display_name', 'Operator')
+      ) ON CONFLICT (user_id) DO NOTHING;
 
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+      RETURN NEW;
+    END;
+    $func$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Drop existing trigger if exists
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-
--- Create trigger
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+    DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+    CREATE TRIGGER on_auth_user_created
+      AFTER INSERT ON auth.users
+      FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+  END IF;
+END $$;
 
 -- ==========================================
 -- INITIAL CATALOG SEED DATA
