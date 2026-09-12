@@ -176,41 +176,57 @@ ALTER TABLE public.quest_chains ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quest_chain_tasks ENABLE ROW LEVEL SECURITY;
 
 -- Profiles Policies
-CREATE POLICY "Users view own profile" ON public.profiles FOR SELECT USING (id = auth.uid());
-CREATE POLICY "Users update own profile" ON public.profiles FOR UPDATE USING (id = auth.uid());
+DROP POLICY IF EXISTS "Users view own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Public profiles access" ON public.profiles;
+CREATE POLICY "Public profiles access" ON public.profiles FOR ALL USING (true) WITH CHECK (true);
 
 -- Characters Policies
-CREATE POLICY "Users view own character" ON public.characters FOR SELECT USING (user_id = auth.uid());
-CREATE POLICY "Users update own character" ON public.characters FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "Users view own character" ON public.characters;
+DROP POLICY IF EXISTS "Users update own character" ON public.characters;
+DROP POLICY IF EXISTS "Public characters access" ON public.characters;
+CREATE POLICY "Public characters access" ON public.characters FOR ALL USING (true) WITH CHECK (true);
 
 -- Tasks Policies
-CREATE POLICY "Users manage own tasks" ON public.tasks FOR ALL USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "Users manage own tasks" ON public.tasks;
+DROP POLICY IF EXISTS "Public tasks access" ON public.tasks;
+CREATE POLICY "Public tasks access" ON public.tasks FOR ALL USING (true) WITH CHECK (true);
 
 -- Task Completions Policies
-CREATE POLICY "Users view own task completions" ON public.task_completions FOR SELECT USING (user_id = auth.uid());
-CREATE POLICY "Users insert own task completions" ON public.task_completions FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Users view own task completions" ON public.task_completions;
+DROP POLICY IF EXISTS "Users insert own task completions" ON public.task_completions;
+DROP POLICY IF EXISTS "Public task completions access" ON public.task_completions;
+CREATE POLICY "Public task completions access" ON public.task_completions FOR ALL USING (true) WITH CHECK (true);
 
 -- Items Catalog Policies
-CREATE POLICY "Authenticated users view items" ON public.items FOR SELECT TO authenticated USING (true);
+DROP POLICY IF EXISTS "Authenticated users view items" ON public.items;
+DROP POLICY IF EXISTS "Public items access" ON public.items;
+CREATE POLICY "Public items access" ON public.items FOR SELECT USING (true);
 
 -- Inventory Policies
-CREATE POLICY "Users view own inventory" ON public.inventory FOR SELECT USING (user_id = auth.uid());
-CREATE POLICY "Users insert own inventory" ON public.inventory FOR INSERT WITH CHECK (user_id = auth.uid());
-CREATE POLICY "Users update own inventory" ON public.inventory FOR UPDATE USING (user_id = auth.uid());
+DROP POLICY IF EXISTS "Users view own inventory" ON public.inventory;
+DROP POLICY IF EXISTS "Users insert own inventory" ON public.inventory;
+DROP POLICY IF EXISTS "Users update own inventory" ON public.inventory;
+DROP POLICY IF EXISTS "Public inventory access" ON public.inventory;
+CREATE POLICY "Public inventory access" ON public.inventory FOR ALL USING (true) WITH CHECK (true);
 
 -- Achievements Policies
-CREATE POLICY "Authenticated users view achievements" ON public.achievements FOR SELECT TO authenticated USING (true);
-CREATE POLICY "Users view own unlocked achievements" ON public.user_achievements FOR SELECT USING (user_id = auth.uid());
-CREATE POLICY "Users insert own user_achievements" ON public.user_achievements FOR INSERT WITH CHECK (user_id = auth.uid());
+DROP POLICY IF EXISTS "Authenticated users view achievements" ON public.achievements;
+DROP POLICY IF EXISTS "Users view own unlocked achievements" ON public.user_achievements;
+DROP POLICY IF EXISTS "Users insert own user_achievements" ON public.user_achievements;
+DROP POLICY IF EXISTS "Public achievements access" ON public.achievements;
+DROP POLICY IF EXISTS "Public user achievements access" ON public.user_achievements;
+CREATE POLICY "Public achievements access" ON public.achievements FOR SELECT USING (true);
+CREATE POLICY "Public user achievements access" ON public.user_achievements FOR ALL USING (true) WITH CHECK (true);
 
 -- Quest Chains Policies
-CREATE POLICY "Users manage own quest chains" ON public.quest_chains FOR ALL USING (user_id = auth.uid());
-CREATE POLICY "Users view chain tasks" ON public.quest_chain_tasks FOR SELECT USING (
-  EXISTS (SELECT 1 FROM public.quest_chains WHERE id = chain_id AND user_id = auth.uid())
-);
-CREATE POLICY "Users insert chain tasks" ON public.quest_chain_tasks FOR INSERT WITH CHECK (
-  EXISTS (SELECT 1 FROM public.quest_chains WHERE id = chain_id AND user_id = auth.uid())
-);
+DROP POLICY IF EXISTS "Users manage own quest chains" ON public.quest_chains;
+DROP POLICY IF EXISTS "Users view chain tasks" ON public.quest_chain_tasks;
+DROP POLICY IF EXISTS "Users insert chain tasks" ON public.quest_chain_tasks;
+DROP POLICY IF EXISTS "Public quest chains access" ON public.quest_chains;
+DROP POLICY IF EXISTS "Public quest chain tasks access" ON public.quest_chain_tasks;
+CREATE POLICY "Public quest chains access" ON public.quest_chains FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Public quest chain tasks access" ON public.quest_chain_tasks FOR ALL USING (true) WITH CHECK (true);
 
 -- ==========================================
 -- AUTOMATIC PROFILE & CHARACTER CREATION TRIGGER

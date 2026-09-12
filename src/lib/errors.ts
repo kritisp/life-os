@@ -38,15 +38,23 @@ export class ValidationError extends AppError {
  * without leaking raw SQL or sensitive stack traces.
  */
 export function sanitizeErrorMessage(error: unknown): string {
-  if (error instanceof AppError) {
-    return error.message
-  }
-  if (error instanceof Error) {
-    // Suppress Postgres / Supabase SQL error details in client-facing response
-    if (error.message.includes('postgres') || error.message.includes('relation')) {
-      return 'A database operation failed. Please try again.'
+  if (!error) return 'An unexpected error occurred. Please try again.'
+
+  if (typeof error === 'string') return error
+
+  if (typeof error === 'object' && error !== null) {
+    const errObj = error as { message?: string; details?: string; hint?: string }
+    if (errObj.message) {
+      if (errObj.message.includes('row-level security') || errObj.message.includes('RLS')) {
+        return 'Database RLS policy rejected request. Please execute the updated schema.sql in Supabase SQL editor.'
+      }
+      return errObj.message
     }
+  }
+
+  if (error instanceof Error) {
     return error.message
   }
+
   return 'An unexpected error occurred. Please try again.'
 }

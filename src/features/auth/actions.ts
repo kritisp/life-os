@@ -37,7 +37,7 @@ export async function signUp(formData: FormData) {
     .from('profiles')
     .select('id')
     .eq('email', email)
-    .single()
+    .maybeSingle()
 
   if (existingProfile) {
     return { error: 'An account with this email address already exists. Please log in.' }
@@ -102,7 +102,7 @@ export async function logIn(formData: FormData) {
     .from('profiles')
     .select('id, email, display_name, password_hash')
     .eq('email', email)
-    .single()
+    .maybeSingle()
 
   if (error || !profile || !profile.password_hash) {
     return { error: 'Invalid email or password' }
@@ -126,7 +126,7 @@ export async function logIn(formData: FormData) {
     .from('characters')
     .select('id')
     .eq('user_id', profile.id)
-    .single()
+    .maybeSingle()
 
   if (!existingChar) {
     await supabase.from('characters').insert({
@@ -164,7 +164,7 @@ export async function getCharacter() {
     .from('characters')
     .select('*')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
   return (character as CharacterRow | null)
 }
