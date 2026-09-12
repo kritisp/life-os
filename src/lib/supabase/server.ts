@@ -2,18 +2,25 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { Database } from '@/types/database'
 
+/**
+ * Creates an authoritative server-side Supabase client.
+ * Strictly requires SUPABASE_SECRET_KEY for privileged server actions (fails closed).
+ */
 export async function createClient() {
   const cookieStore = await cookies()
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-  const supabaseKey =
-    process.env.SUPABASE_SECRET_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    ''
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY
 
-  return createServerClient<Database>(supabaseUrl, supabaseKey, {
+  if (!supabaseUrl) {
+    throw new Error('FATAL CONFIGURATION ERROR: NEXT_PUBLIC_SUPABASE_URL is missing.')
+  }
+
+  if (!supabaseSecretKey) {
+    throw new Error('FATAL CONFIGURATION ERROR: SUPABASE_SECRET_KEY is missing. Server operations fail closed.')
+  }
+
+  return createServerClient<Database>(supabaseUrl, supabaseSecretKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll()

@@ -293,7 +293,11 @@ ON CONFLICT DO NOTHING;
 -- ==========================================
 
 CREATE OR REPLACE FUNCTION public.complete_quest_rpc(p_task_id UUID, p_user_id UUID DEFAULT NULL)
-RETURNS JSONB AS $$
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
 DECLARE
   v_user_id UUID := COALESCE(p_user_id, auth.uid());
   v_task public.tasks%ROWTYPE;
@@ -304,9 +308,19 @@ DECLARE
   v_prev_level INT;
   v_new_level INT;
   v_new_xp INT;
+  v_next_level_xp INT;
   v_did_level_up BOOLEAN;
   v_recent_completions INT;
   v_momentum INT;
+  v_prev_archetype TEXT;
+  v_new_archetype TEXT;
+  v_archetype_desc TEXT;
+  v_max_stat INT;
+  v_min_stat INT;
+  v_total_completions INT;
+  v_new_achievements JSONB := '[]'::jsonb;
+  v_ach_record RECORD;
+  v_unlocked_ach RECORD;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Authentication required';
@@ -322,13 +336,18 @@ BEGIN
     RAISE EXCEPTION 'Quest is already completed';
   END IF;
 
+  -- Check if completion record already exists (duplicate prevention)
+  IF EXISTS (SELECT 1 FROM public.task_completions WHERE task_id = p_task_id) THEN
+    RAISE EXCEPTION 'Quest completion log already exists';
+  END IF;
+
   -- Lock character row
   SELECT * INTO v_char FROM public.characters WHERE user_id = v_user_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Character record not found';
   END IF;
 
-  -- Rewards calculation based on difficulty
+  -- Authoritative rewards calculation based on difficulty
   IF v_task.difficulty = 'easy' THEN
     v_xp_gained := 50; v_gold_gained := 20; v_stat_gained := 1;
   ELSIF v_task.difficulty = 'medium' THEN
@@ -342,14 +361,16 @@ BEGIN
   END IF;
 
   v_prev_level := v_char.level;
+  v_prev_archetype := v_char.archetype;
   v_new_xp := v_char.xp + v_xp_gained;
 
-  -- Calculate level from total XP formula (100 * Level^1.5)
+  -- Level formula (100 * Level^1.5)
   v_new_level := 1;
   WHILE v_new_xp >= FLOOR(100 * POWER(v_new_level + 1, 1.5)) LOOP
     v_new_level := v_new_level + 1;
   END LOOP;
   v_did_level_up := (v_new_level > v_prev_level);
+  v_next_level_xp := FLOOR(100 * POWER(v_new_level + 1, 1.5)) - FLOOR(100 * POWER(v_new_level, 1.5));
 
   -- Update stat attributes
   IF v_task.attribute = 'strength' THEN v_char.strength := v_char.strength + v_stat_gained;
@@ -359,12 +380,42 @@ BEGIN
   ELSIF v_task.attribute = 'creativity' THEN v_char.creativity := v_char.creativity + v_stat_gained;
   END IF;
 
+  -- Deterministic Archetype Calculation
+  v_max_stat := GREATEST(v_char.strength, v_char.intellect, v_char.discipline, v_char.vitality, v_char.creativity);
+  v_min_stat := LEAST(v_char.strength, v_char.intellect, v_char.discipline, v_char.vitality, v_char.creativity);
+
+  IF (v_max_stat - v_min_stat <= 5) THEN
+    v_new_archetype := 'The Balanced';
+    v_archetype_desc := 'Versatile operator developing across all core attributes';
+  ELSIF (v_char.intellect >= v_max_stat - 3 AND v_char.creativity >= v_max_stat - 3 AND v_char.intellect > v_char.strength) THEN
+    v_new_archetype := 'The Builder';
+    v_archetype_desc := 'Master of technical architecture and creative systems';
+  ELSIF (v_char.intellect >= v_max_stat - 3 AND v_char.discipline >= v_max_stat - 3) THEN
+    v_new_archetype := 'The Strategist';
+    v_archetype_desc := 'Tactical planner balancing analytical foresight with execution';
+  ELSIF (v_char.intellect = v_max_stat) THEN
+    v_new_archetype := 'The Scholar';
+    v_archetype_desc := 'Relentless seeker of deep knowledge and systematic mastery';
+  ELSIF (v_char.strength = v_max_stat) THEN
+    v_new_archetype := 'The Warrior';
+    v_archetype_desc := 'Unstoppable physical titan powered by endurance and strength';
+  ELSIF (v_char.creativity = v_max_stat) THEN
+    v_new_archetype := 'The Creator';
+    v_archetype_desc := 'Prolific artisan transforming ideas into disciplined output';
+  ELSIF (v_char.discipline = v_max_stat) THEN
+    v_new_archetype := 'The Disciplined';
+    v_archetype_desc := 'Monk-like operator defined by unwavering habit adherence';
+  ELSE
+    v_new_archetype := 'The Balanced';
+    v_archetype_desc := 'Versatile operator developing across all core attributes';
+  END IF;
+
   -- Calculate Streak
   IF v_char.last_active_date IS NULL THEN
     v_char.current_streak := 1;
     v_char.longest_streak := GREATEST(v_char.longest_streak, 1);
   ELSIF v_char.last_active_date = CURRENT_DATE THEN
-    -- Same-day completion: streak count preserved
+    -- Same-day completion: streak maintained
   ELSIF v_char.last_active_date = CURRENT_DATE - INTERVAL '1 day' THEN
     v_char.current_streak := v_char.current_streak + 1;
     v_char.longest_streak := GREATEST(v_char.longest_streak, v_char.current_streak);
@@ -376,11 +427,11 @@ BEGIN
   -- Mark task completed
   UPDATE public.tasks SET status = 'completed', updated_at = now() WHERE id = p_task_id;
 
-  -- Insert task completion record
+  -- Insert task completion log
   INSERT INTO public.task_completions (user_id, task_id, xp_awarded, gold_awarded, attribute_stat_awarded, completion_date)
   VALUES (v_user_id, p_task_id, v_xp_gained, v_gold_gained, v_stat_gained, CURRENT_DATE);
 
-  -- Count recent completions in last 7 days for momentum
+  -- Calculate 7-day momentum
   SELECT COUNT(*) INTO v_recent_completions FROM public.task_completions
   WHERE user_id = v_user_id AND completion_date >= (CURRENT_DATE - INTERVAL '7 days');
 
@@ -399,9 +450,32 @@ BEGIN
     current_streak = v_char.current_streak,
     longest_streak = v_char.longest_streak,
     momentum = v_momentum,
+    archetype = v_new_archetype,
     last_active_date = CURRENT_DATE,
     updated_at = now()
   WHERE user_id = v_user_id;
+
+  -- Total completions for achievements check
+  SELECT COUNT(*) INTO v_total_completions FROM public.task_completions WHERE user_id = v_user_id;
+
+  -- Check and unlock achievements
+  FOR v_ach_record IN
+    SELECT * FROM public.achievements
+    WHERE (code = 'FIRST_QUEST' AND v_total_completions >= 1)
+       OR (code = 'STREAK_3' AND v_char.current_streak >= 3)
+       OR (code = 'STREAK_7' AND v_char.current_streak >= 7)
+       OR (code = 'QUESTS_10' AND v_total_completions >= 10)
+       OR (code = 'LEVEL_5' AND v_new_level >= 5)
+  LOOP
+    INSERT INTO public.user_achievements (user_id, achievement_id)
+    VALUES (v_user_id, v_ach_record.id)
+    ON CONFLICT (user_id, achievement_id) DO NOTHING
+    RETURNING achievement_id INTO v_unlocked_ach;
+
+    IF v_unlocked_ach IS NOT NULL THEN
+      v_new_achievements := v_new_achievements || jsonb_build_array(row_to_json(v_ach_record)::jsonb);
+    END IF;
+  END LOOP;
 
   RETURN jsonb_build_object(
     'success', true,
@@ -413,20 +487,32 @@ BEGIN
     'newLevel', v_new_level,
     'didLevelUp', v_did_level_up,
     'currentXp', v_new_xp,
+    'xpRequiredForNextLevel', v_next_level_xp,
     'currentStreak', v_char.current_streak,
     'longestStreak', v_char.longest_streak,
-    'momentum', v_momentum
+    'momentum', v_momentum,
+    'build', jsonb_build_object(
+      'name', v_new_archetype,
+      'description', v_archetype_desc
+    ),
+    'didArchetypeChange', (v_new_archetype != v_prev_archetype),
+    'newlyUnlockedAchievements', v_new_achievements
   );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 CREATE OR REPLACE FUNCTION public.purchase_item_rpc(p_item_id UUID, p_user_id UUID DEFAULT NULL)
-RETURNS JSONB AS $$
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
 DECLARE
   v_user_id UUID := COALESCE(p_user_id, auth.uid());
   v_item public.items%ROWTYPE;
   v_char public.characters%ROWTYPE;
   v_inv_id UUID;
+  v_first_purchase_ach public.achievements%ROWTYPE;
 BEGIN
   IF v_user_id IS NULL THEN
     RAISE EXCEPTION 'Authentication required';
@@ -456,10 +542,31 @@ BEGIN
   VALUES (v_user_id, p_item_id, false)
   RETURNING id INTO v_inv_id;
 
+  -- Check FIRST_PURCHASE achievement
+  SELECT * INTO v_first_purchase_ach FROM public.achievements WHERE code = 'FIRST_PURCHASE';
+  IF FOUND THEN
+    INSERT INTO public.user_achievements (user_id, achievement_id)
+    VALUES (v_user_id, v_first_purchase_ach.id)
+    ON CONFLICT (user_id, achievement_id) DO NOTHING;
+  END IF;
+
   RETURN jsonb_build_object(
     'success', true,
     'remainingGold', v_char.gold - v_item.price,
     'inventoryId', v_inv_id
   );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
+
+-- Restrict RPC permissions: Revoke execute from public/anon/authenticated; grant to service_role/postgres
+REVOKE EXECUTE ON FUNCTION public.complete_quest_rpc(UUID, UUID) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.complete_quest_rpc(UUID, UUID) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.complete_quest_rpc(UUID, UUID) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.complete_quest_rpc(UUID, UUID) TO postgres;
+GRANT EXECUTE ON FUNCTION public.complete_quest_rpc(UUID, UUID) TO service_role;
+
+REVOKE EXECUTE ON FUNCTION public.purchase_item_rpc(UUID, UUID) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.purchase_item_rpc(UUID, UUID) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.purchase_item_rpc(UUID, UUID) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.purchase_item_rpc(UUID, UUID) TO postgres;
+GRANT EXECUTE ON FUNCTION public.purchase_item_rpc(UUID, UUID) TO service_role;

@@ -36,12 +36,7 @@ export function verifyPassword(password: string, combinedHash: string): boolean 
     const derivedKey = crypto.scryptSync(password, salt, 64)
     const storedBuffer = Buffer.from(storedHash, 'hex')
     if (storedBuffer.length !== derivedKey.length) {
-      // Fallback check for legacy PBKDF2 hashes if length doesn't match scrypt 64-byte key
-      const pbkdf2Hash = crypto.pbkdf2Sync(password, salt, 1000, 64, 'sha512').toString('hex')
-      const legacyBuffer = Buffer.from(storedHash, 'hex')
-      const pbkdf2Buffer = Buffer.from(pbkdf2Hash, 'hex')
-      if (legacyBuffer.length !== pbkdf2Buffer.length) return false
-      return crypto.timingSafeEqual(legacyBuffer, pbkdf2Buffer)
+      return false
     }
     return crypto.timingSafeEqual(storedBuffer, derivedKey)
   } catch {

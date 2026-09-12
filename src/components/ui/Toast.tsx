@@ -8,7 +8,7 @@ export interface ToastItem {
   id: string
   title: string
   description?: string
-  type?: 'quest_completed' | 'gold' | 'achievement' | 'level_up' | 'error' | 'info'
+  type?: 'quest_completed' | 'gold' | 'achievement' | 'level_up' | 'error' | 'info' | 'item_unlocked'
 }
 
 interface ToastContextType {

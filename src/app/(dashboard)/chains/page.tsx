@@ -1,15 +1,20 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Swords, Plus, X } from 'lucide-react'
 import { getQuestChains, createQuestChain } from '@/features/chains/actions'
 import { QuestChainWithDetails } from '@/types'
+import { StaggerContainer, StaggerItem, AnimatedNumber } from '@/components/ui/Motion'
+import { useToast } from '@/components/ui/Toast'
 
 export default function QuestChainsPage() {
   const [chains, setChains] = useState<QuestChainWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const { addToast } = useToast()
 
   const reloadChains = () => {
     getQuestChains().then((list) => {
@@ -36,41 +41,60 @@ export default function QuestChainsPage() {
     const title = formData.get('title') as string
     const description = formData.get('description') as string
 
-    await createQuestChain(title, description)
+    const res = await createQuestChain(title, description)
     setIsSubmitting(false)
-    setShowModal(false)
-    reloadChains()
+
+    if (res.error) {
+      addToast({
+        title: 'CREATION FAILED',
+        description: res.error,
+        type: 'error',
+      })
+    } else {
+      setShowModal(false)
+      reloadChains()
+      addToast({
+        title: 'CAMPAIGN FORGED',
+        description: `Quest chain "${title}" activated.`,
+        type: 'info',
+      })
+    }
   }
 
   return (
-    <>
-      <div className="hero-heading">
-        <div>
-          <p className="eyebrow">LONG-TERM PROGRESSION · {chains.length} PATHS</p>
-          <h1>
-            FOLLOW THE <em>THREAD.</em>
-          </h1>
+    <StaggerContainer className="space-y-6">
+      <StaggerItem>
+        <div className="hero-heading">
+          <div>
+            <p className="eyebrow">LONG-TERM PROGRESSION · {chains.length} ACTIVE CAMPAIGNS</p>
+            <h1>
+              FOLLOW THE <em>THREAD.</em>
+            </h1>
+          </div>
+          <button className="quick-add group" onClick={() => setShowModal(true)}>
+            <Plus size={15} className="group-hover:rotate-90 transition-transform duration-200" />
+            FORGE CAMPAIGN
+          </button>
         </div>
-        <button className="quick-add" onClick={() => setShowModal(true)}>
-          <Swords size={15} /> NEW CHAIN
-        </button>
-      </div>
+      </StaggerItem>
 
       {loading ? (
         <div className="p-12 text-center text-xs font-mono text-[#7b8586] border border-[#293033] bg-[#111416]">
-          LOADING QUEST CHAINS...
+          INITIALIZING CAMPAIGN DATA...
         </div>
       ) : chains.length === 0 ? (
-        <div className="p-12 text-center border border-[#293033] bg-[#111416] space-y-4">
-          <Swords size={32} className="mx-auto text-[#d7a646]" />
-          <p className="text-sm font-mono text-[#e7e8e4]">NO ACTIVE QUEST CHAINS</p>
-          <p className="text-xs font-mono text-[#7b8586] max-w-sm mx-auto">
-            Create an ordered quest chain (e.g. THE DEVELOPER&apos;S PATH) to group complex multi-stage objectives.
-          </p>
-          <button className="quick-add mx-auto" onClick={() => setShowModal(true)}>
-            <Plus size={15} /> FORGE FIRST QUEST CHAIN
-          </button>
-        </div>
+        <StaggerItem>
+          <div className="p-12 text-center border border-[#293033] bg-[#111416] space-y-4">
+            <Swords size={32} className="mx-auto text-[#d7a646]" />
+            <p className="text-sm font-mono text-[#e7e8e4]">NO ACTIVE QUEST CHAINS</p>
+            <p className="text-xs font-mono text-[#7b8586] max-w-sm mx-auto">
+              Create an ordered campaign path (e.g. THE DEVELOPER&apos;S PATH) to group multi-stage objectives and track deep momentum.
+            </p>
+            <button className="quick-add mx-auto" onClick={() => setShowModal(true)}>
+              <Plus size={15} /> FORGE FIRST QUEST CHAIN
+            </button>
+          </div>
+        </StaggerItem>
       ) : (
         <div className="chains-grid">
           {chains.map((chain) => {
@@ -80,43 +104,57 @@ export default function QuestChainsPage() {
                 : 0
 
             return (
-              <article className="panel chain-card" key={chain.id}>
-                <div className="chain-card-top">
-                  <span className="chain-badge">
-                    <Swords size={19} />
-                  </span>
-                  <span className="eyebrow">ACTIVE PATH</span>
-                  <b>{chain.isCompleted ? 'CAMPAIGN COMPLETE' : `STAGE ${chain.currentStage}`}</b>
-                </div>
+              <StaggerItem key={chain.id}>
+                <article className="panel chain-card">
+                  <div className="chain-card-top">
+                    <span className="chain-badge">
+                      <Swords size={19} />
+                    </span>
+                    <span className="eyebrow">ACTIVE PATH</span>
+                    <b className="font-mono text-xs">
+                      {chain.isCompleted ? 'CAMPAIGN COMPLETE' : `STAGE ${chain.currentStage}`}
+                    </b>
+                  </div>
 
-                <h2>{chain.title.toUpperCase()}</h2>
-                <p>{chain.description || 'Ordered multi-step progression chain'}</p>
+                  <h2 className="font-mono text-base mt-2">{chain.title.toUpperCase()}</h2>
+                  <p className="text-xs text-[#7b8586] mt-1">{chain.description || 'Ordered multi-step progression chain'}</p>
 
-                <div className="chain-progress-row">
-                  <span>
-                    {chain.completedSteps} / {chain.totalSteps} QUESTS
-                  </span>
-                  <strong>{percentage}%</strong>
-                </div>
+                  <div className="chain-progress-row font-mono text-xs mt-4">
+                    <span className="text-[#8e9799]">
+                      <AnimatedNumber value={chain.completedSteps} /> / {chain.totalSteps} QUESTS COMPLETE
+                    </span>
+                    <strong className="text-amber-400">{percentage}%</strong>
+                  </div>
 
-                <div className="progress-track">
-                  <div className="progress-fill" style={{ width: `${percentage}%` }} />
-                </div>
-              </article>
+                  <div className="progress-track overflow-hidden mt-1.5">
+                    <motion.div
+                      className="progress-fill h-full bg-[#d7a646]"
+                      initial={{ width: '0%' }}
+                      animate={{ width: `${percentage}%` }}
+                      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                    />
+                  </div>
+                </article>
+              </StaggerItem>
             )
           })}
         </div>
       )}
 
       {showModal && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <div className="quest-modal panel">
-            <button className="modal-close" onClick={() => setShowModal(false)}>
+        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm" role="dialog" aria-modal="true">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            className="quest-modal panel max-w-lg w-full relative"
+          >
+            <button className="modal-close" onClick={() => setShowModal(false)} aria-label="Close modal">
               <X size={17} />
             </button>
 
             <p className="eyebrow">CAMPAIGN FORGING · NEW ENTRY</p>
-            <h2>CREATE QUEST CHAIN</h2>
+            <h2>FORGE QUEST CHAIN</h2>
             <p className="modal-copy">Define an ordered multi-stage quest line for complex goals.</p>
 
             <form action={handleCreateChain} className="quest-form">
@@ -142,15 +180,15 @@ export default function QuestChainsPage() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="quick-add modal-submit mt-4"
+                className="quick-add modal-submit mt-4 w-full justify-center"
               >
                 <Swords size={15} />
-                {isSubmitting ? 'FORGING CHAIN...' : 'CREATE QUEST CHAIN'}
+                {isSubmitting ? 'FORGING CHAIN...' : 'FORGE QUEST CHAIN'}
               </button>
             </form>
-          </div>
+          </motion.div>
         </div>
       )}
-    </>
+    </StaggerContainer>
   )
 }
