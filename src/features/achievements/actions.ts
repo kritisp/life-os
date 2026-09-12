@@ -1,14 +1,13 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/features/auth/actions'
 import { sanitizeErrorMessage } from '@/lib/errors'
 import { AchievementRow } from '@/types'
 
 export async function getAchievements() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   const { data: achievements, error } = await supabase
     .from('achievements')

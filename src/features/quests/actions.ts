@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/features/auth/actions'
 import {
   AttributeType,
   QuestDifficulty,
@@ -48,9 +49,7 @@ export async function createTask(formData: FormData) {
   }
 
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) {
     return { error: 'Authentication required' }
@@ -84,9 +83,7 @@ export async function createTask(formData: FormData) {
 
 export async function getTasks(statusFilter: 'all' | 'active' | 'completed' = 'active') {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) return []
 
@@ -102,9 +99,7 @@ export async function getTasks(statusFilter: 'all' | 'active' | 'completed' = 'a
 
 export async function deleteTask(taskId: string) {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) {
     return { error: 'Authentication required' }
@@ -125,12 +120,9 @@ export async function deleteTask(taskId: string) {
 
 export async function completeQuest(taskId: string): Promise<QuestCompletionResult> {
   const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
-  if (authError || !user) {
+  if (!user) {
     throw new UnauthorizedError()
   }
 

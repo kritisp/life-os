@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/features/auth/actions'
 import { ItemPurchaseResult, AchievementRow, ItemRow, CharacterRow, InventoryRow } from '@/types'
 import {
   UnauthorizedError,
@@ -24,9 +25,7 @@ export async function getShopItems() {
 
 export async function getUserInventory() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) return []
 
@@ -40,12 +39,9 @@ export async function getUserInventory() {
 
 export async function purchaseItem(itemId: string): Promise<ItemPurchaseResult> {
   const supabase = await createClient()
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
-  if (authError || !user) {
+  if (!user) {
     throw new UnauthorizedError()
   }
 

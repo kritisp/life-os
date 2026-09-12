@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/features/auth/actions'
 import { sanitizeErrorMessage } from '@/lib/errors'
 import { TaskRow } from '@/types'
 
@@ -10,9 +11,7 @@ export async function createQuestChain(title: string, description?: string) {
   }
 
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) {
     return { error: 'Authentication required' }
@@ -37,9 +36,7 @@ export async function createQuestChain(title: string, description?: string) {
 
 export async function addQuestToChain(chainId: string, taskId: string, stepOrder: number) {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) {
     return { error: 'Authentication required' }
@@ -87,9 +84,7 @@ export async function addQuestToChain(chainId: string, taskId: string, stepOrder
 
 export async function getQuestChains() {
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
 
   if (!user) return []
 
