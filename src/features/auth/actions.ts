@@ -152,13 +152,17 @@ export async function demoLogin() {
   const demoEmail = 'operator_demo@lifeos.dev'
   const demoPassword = 'DemoPassword123!'
 
-  let { data, error } = await supabase.auth.signInWithPassword({
+  let targetUser = null
+
+  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
     email: demoEmail,
     password: demoPassword,
   })
 
-  if (error || !data.user) {
-    const signUpRes = await supabase.auth.signUp({
+  if (!signInError && signInData?.user) {
+    targetUser = signInData.user
+  } else {
+    const { data: signUpData } = await supabase.auth.signUp({
       email: demoEmail,
       password: demoPassword,
       options: {
@@ -168,19 +172,19 @@ export async function demoLogin() {
         },
       },
     })
-    data = signUpRes.data
+    targetUser = signUpData?.user || null
   }
 
-  if (data?.user) {
+  if (targetUser) {
     const { data: existingChar } = await supabase
       .from('characters')
       .select('id')
-      .eq('user_id', data.user.id)
+      .eq('user_id', targetUser.id)
       .single()
 
     if (!existingChar) {
       await supabase.from('characters').insert({
-        user_id: data.user.id,
+        user_id: targetUser.id,
         name: 'Demo Operator',
         level: 1,
         xp: 0,
@@ -196,7 +200,7 @@ export async function demoLogin() {
         archetype: 'The Balanced',
       } as CharacterRow)
     }
-    return { success: true, user: data.user }
+    return { success: true, user: targetUser }
   }
 
   return { error: 'Could not initialize demo operator session.' }
